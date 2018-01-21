@@ -11,7 +11,7 @@ public class RpcTest {
            @Override
            public void run() {
                try {
-                   RpcExporter.exporter("localhost",8088);
+                   RpcExporter_2.exporter("localhost",8088);
                } catch (Exception e) {
                    e.printStackTrace();
                }

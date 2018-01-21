@@ -1,7 +1,9 @@
-import java.io.*;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
-import java.lang.reflect.InvocationTargetException;
+import java.lang.invoke.MethodType;
 import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
@@ -10,19 +12,11 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
 /**
- *
- *   RPC服务端服务发布者
- *      主要职责：
- *          （1） 作为服务端监听客户端的TCP连接，接受到新的客户端连接之后，将其封装成Task，由线程池执行
- *          （2） 将客户端发送的码流反序列化成对象，反射调用服务实现者，获取执行结果。
- *          （3） 将执行结果对象反序列化，通过Socket发送给客户端
- *          （4） 远程服务调用结束后，释放Socket等连接资源，防止句柄泄露。
- *          【注】 句柄泄露：http://blog.csdn.net/modiziri/article/details/49928489
- * @Author xxxindy
- * @Date 2018/1/17 下午3:49
+ * @Author: xxxindy
+ * @Date:2018/1/18 下午4:14
+ * @Description:
  */
-public class RpcExporter {
-
+public class RpcExporter_2 {
     //根据cpu核数新建线程池
     static Executor executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
     //发布
@@ -32,7 +26,7 @@ public class RpcExporter {
         server.bind(new InetSocketAddress(hostName,port));
         try {
             while(true){
-                executor.execute(new ExporterTask(server.accept()));
+                executor.execute(new RpcExporter_2.ExporterTask(server.accept()));
             }
         }
         finally {
@@ -68,8 +62,17 @@ public class RpcExporter {
                 Object[] arguments = (Object[])input.readObject();
                 //得到Method对象
                 Method method = service.getMethod(methodName,parameterTypes);
+                Class<?> returnType = method.getReturnType();
                 //传入参数，执行method
-                Object result = method.invoke(service.newInstance(), arguments);
+                MethodHandles.Lookup lookup = MethodHandles.lookup();
+                MethodType methodType = MethodType.methodType(returnType,parameterTypes);
+                MethodHandle methodHandle = lookup.findVirtual(service,methodName,methodType);
+                Object result = null;
+                try {
+                    result = methodHandle.invokeWithArguments(service,arguments);
+                } catch (Throwable throwable) {
+                    throwable.printStackTrace();
+                }
                 //输出结果（返回值）
                 output = new ObjectOutputStream(client.getOutputStream());
                 output.writeObject(result);
